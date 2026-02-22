@@ -5,7 +5,7 @@ A modern, beautiful online code compiler built with Next.js that allows you to w
 
 ## ✨ Features
 
-- **Multi-language Support**: Currently supports JavaScript and Python
+- **python and javascript  Support**: Currently supports JavaScript and Python
 - **Beautiful UI**: Modern design with vibrant colors and smooth animations
 - **Responsive Design**: Works perfectly on desktop and mobile devices
 - **Real-time Compilation**: Instant code execution with live output

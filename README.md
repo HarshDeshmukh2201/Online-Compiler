@@ -1,7 +1,7 @@
 <<<<<<< HEAD
 # 🚀 Online Code Compiler
 
-A modern, beautiful online code compiler built with Next.js that allows you to write, compile, and run code in multiple programming languages with an attractive and responsive interface.
+A modern, beautiful online code compiler built with Next.js that allows you to write, compile, and run code in python and javascript programming languages with an attractive and responsive interface.
 
 ## ✨ Features
 

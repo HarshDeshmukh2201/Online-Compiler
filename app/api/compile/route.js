@@ -5,6 +5,8 @@ import os from "os";
 import path from "path";
 import { randomUUID } from "crypto";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 export const maxDuration = 30;
 

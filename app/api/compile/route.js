@@ -16,7 +16,7 @@ export async function POST(req) {
 
     if (typeof code !== "string" || !code.trim()) {
       return Response.json(
-        { output: "Please provide code to execute." },
+        { output: "Please provide code." },
         { status: 400 }
       );
     }
@@ -28,32 +28,77 @@ export async function POST(req) {
       );
     }
 
-    const fileName = `temp-${randomUUID()}.${
-      language === "py" ? "py" : "js"
-    }`;
+    // Python runs on Judge0
+    if (language === "py") {
+      const apiUrl = process.env.JUDGE0_API_URL;
+      const apiKey = process.env.JUDGE0_API_KEY;
 
-    filePath = path.join(os.tmpdir(), fileName);
+      if (!apiUrl) {
+        return Response.json(
+          { output: "JUDGE0_API_URL is not configured." },
+          { status: 500 }
+        );
+      }
 
+      const headers = {
+        "Content-Type": "application/json",
+      };
+
+      // Include only if your provider requires an API key.
+      if (apiKey) {
+        headers["X-RapidAPI-Key"] = apiKey;
+      }
+
+      const response = await fetch(
+        `${apiUrl.replace(/\/$/, "")}/submissions?base64_encoded=false&wait=true`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            language_id: 71,
+            source_code: code,
+          }),
+          signal: AbortSignal.timeout(20000),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error("Judge0 error:", response.status, result);
+
+        return Response.json(
+          { output: result.message || result.error || "Judge0 request failed." },
+          { status: 502 }
+        );
+      }
+
+      return Response.json({
+        output:
+          result.stdout ??
+          result.stderr ??
+          result.compile_output ??
+          result.message ??
+          result.status?.description ??
+          "No output",
+      });
+    }
+
+    // Keep JavaScript execution on Node.js
+    filePath = path.join(os.tmpdir(), `temp-${randomUUID()}.js`);
     await fs.writeFile(filePath, code, "utf8");
-
-    const command = language === "py" ? "python3" : "node";
 
     const result = await new Promise((resolve) => {
       execFile(
-        command,
+        "node",
         [filePath],
         { timeout: 10000, maxBuffer: 1024 * 1024 },
         (error, stdout, stderr) => {
-          if (error) {
-            resolve({
-              output:
-                stderr ||
-                error.message ||
-                "Code execution failed.",
-            });
-          } else {
-            resolve({ output: stdout || stderr || "" });
-          }
+          resolve({
+            output: error
+              ? stderr || error.message
+              : stdout || stderr || "",
+          });
         }
       );
     });
@@ -63,7 +108,7 @@ export async function POST(req) {
     console.error("Compile API error:", error);
 
     return Response.json(
-      { output: "API error: " + error.message },
+      { output: error.message || "API error" },
       { status: 500 }
     );
   } finally {

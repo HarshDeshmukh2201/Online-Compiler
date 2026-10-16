@@ -1,32 +1,74 @@
-import { exec } from "child_process"; // Yahin se:node temp.js python temp.pychalate hain
-import fs from "fs";
+
+import { execFile } from "child_process";
+import fs from "fs/promises";
+import os from "os";
 import path from "path";
+import { randomUUID } from "crypto";
+
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 export async function POST(req) {
-  const { code, language } = await req.json();
+  let filePath;
 
-  const fileName =
-    language === "py" ? "temp.py" : "temp.js";
+  try {
+    const { code, language } = await req.json();
 
-  const filePath = path.join(process.cwd(), fileName);
+    if (typeof code !== "string" || !code.trim()) {
+      return Response.json(
+        { output: "Please provide code to execute." },
+        { status: 400 }
+      );
+    }
 
-  // save code in file
-  fs.writeFileSync(filePath, code);
+    if (!["js", "py"].includes(language)) {
+      return Response.json(
+        { output: "Unsupported language." },
+        { status: 400 }
+      );
+    }
 
-  const command =
-    language === "py"
-      ? `python ${filePath}`
-      : `node ${filePath}`;
+    const fileName = `temp-${randomUUID()}.${
+      language === "py" ? "py" : "js"
+    }`;
 
-  return new Promise((resolve) => {
-    exec(command, (error, stdout, stderr) => {
-      fs.unlinkSync(filePath);
+    filePath = path.join(os.tmpdir(), fileName);
 
-      resolve(
-        Response.json({
-          output: error ? stderr : stdout,
-        })
+    await fs.writeFile(filePath, code, "utf8");
+
+    const command = language === "py" ? "python3" : "node";
+
+    const result = await new Promise((resolve) => {
+      execFile(
+        command,
+        [filePath],
+        { timeout: 10000, maxBuffer: 1024 * 1024 },
+        (error, stdout, stderr) => {
+          if (error) {
+            resolve({
+              output:
+                stderr ||
+                error.message ||
+                "Code execution failed.",
+            });
+          } else {
+            resolve({ output: stdout || stderr || "" });
+          }
+        }
       );
     });
-  });
+
+    return Response.json(result);
+  } catch (error) {
+    console.error("Compile API error:", error);
+
+    return Response.json(
+      { output: "API error: " + error.message },
+      { status: 500 }
+    );
+  } finally {
+    if (filePath) {
+      await fs.unlink(filePath).catch(() => {});
+    }
+  }
 }
